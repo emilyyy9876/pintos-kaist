@@ -162,6 +162,7 @@ list_insert (struct list_elem *before, struct list_elem *elem) {
 	elem->next = before;
 	before->prev->next = elem;
 	before->prev = elem;
+
 }
 
 /* Removes elements FIRST though LAST (exclusive) from their
@@ -199,7 +200,7 @@ list_push_front (struct list *list, struct list_elem *elem) {
 /* Inserts ELEM at the end of LIST, so that it becomes the
    back in LIST. */
 void
-list_push_back (struct list *list, struct list_elem *elem) {
+list_push_back (struct list *list, struct list_elem *elem) { ///////////////////////////////////////////////////////////////
 	list_insert (list_end (list), elem);
 }
 
@@ -317,6 +318,9 @@ list_reverse (struct list *list) {
 		swap (&list->head.next->prev, &list->tail.prev->next);
 	}
 }
+
+
+
 
 /* Returns true only if the list elements A through B (exclusive)
    are in order according to LESS given auxiliary data AUX. */
