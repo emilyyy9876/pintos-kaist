@@ -112,8 +112,10 @@ sema_up (struct semaphore *sema) {
 	ASSERT (sema != NULL);
 
 	old_level = intr_disable ();
-	if (!list_empty (&sema->waiters))
+	if (!list_empty (&sema->waiters)){
+      list_sort(&sema->waiters, compare_priority, NULL);
 		thread_unblock (list_entry (list_pop_front (&sema->waiters), struct thread, elem));
+   }
 	sema->value++;
 	test_max_priority();
 	intr_set_level (old_level);
@@ -208,6 +210,15 @@ void donate_priority(void){
    struct thread *holders = curr->wait_on_lock->holder;
 
    holders->priority = curr->priority;
+   for(int i = 0; i < 8; i++){
+      if(!holders->wait_on_lock)
+         break;
+      curr= holders;
+      holders = curr->wait_on_lock->holder;
+
+      holders->priority = curr->priority;
+   }
+    
 }
 
 
