@@ -91,9 +91,20 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
-
+	/*----------------------------Project 1------------------------------------*/
+	int64_t wakeup_tick;				// sleep후 깨어날 시간	
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+
+	/*---------------------------- Donation ------------------------------------*/
+
+	int init_priority;	// 처음 priority	
+	struct list donations; // donation 받은 스레드 리스트
+	struct list_elem donation_elem;
+	struct lock *wait_on_lock; // 기다리고 있는 lock
+	
+	
+
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -117,8 +128,26 @@ extern bool thread_mlfqs;
 void thread_init (void);
 void thread_start (void);
 
+/*----------------------------Project 1------------------------------------*/
+
+/* 실행 중인 스레드를 슬립으로 재운다. */
+void thread_sleep(int64_t ticks);
+/* 슬립 큐에서 깨워야 할 스레드를 깨운다. */
+void thread_awake(int64_t ticks);
+/* 최소 틱을 가진 스레드를 저장한다. */
+void update_next_tick_to_awake(int64_t ticks);
+/* thread.c의 next_tick_to_awake 반환 */
+int64_t get_next_tick_to_awake(void);
+
+
+/*----------------------------Project 1------------------------------------*/
+
+bool compare_priority (struct list_elem *a, struct list_elem *b, void *aux);
+bool compare_donate_priority (struct list_elem *a, struct list_elem *b, void *aux);
+void test_max_priority (void);
 void thread_tick (void);
 void thread_print_stats (void);
+
 
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);

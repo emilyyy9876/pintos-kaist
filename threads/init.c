@@ -93,8 +93,8 @@ main (void) {
 #endif
 
 	/* Initialize interrupt handlers. */
-	intr_init ();
-	timer_init ();
+	intr_init ();	//인터럽트 초기화
+	timer_init ();	//타이머 초기화
 	kbd_init ();
 	input_init ();
 #ifdef USERPROG
@@ -102,7 +102,7 @@ main (void) {
 	syscall_init ();
 #endif
 	/* Start thread scheduler and enable interrupts. */
-	thread_start ();
+	thread_start ();	// 스레드 스케줄러를 시작해서 스레드의 실행을 관리
 	serial_init_queue ();
 	timer_calibrate ();
 
@@ -119,7 +119,7 @@ main (void) {
 	printf ("Boot complete.\n");
 
 	/* Run actions specified on kernel command line. */
-	run_actions (argv);
+	run_actions (argv);	// 커널 명령어 실행 // 테스트 실행
 
 	/* Finish up. */
 	if (power_off_when_done)
