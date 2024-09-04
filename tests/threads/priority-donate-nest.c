@@ -92,3 +92,5 @@ high_thread_func (void *lock_)
   lock_release (lock);
   msg ("High thread finished.");
 }
+
+
