@@ -1,33 +1,67 @@
 {
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
   "configurations": [
-    {
-      "type": "gdb",
-      "request": "attach",
-      "name": "Attach to gdbserver : threads",
-      "executable": "${workspaceRoot}/threads/build/kernel.o",
-      "target": "localhost:1234",
-      "remote": true,
-      "cwd": "${workspaceRoot}",
-      "valuesFormatting": "parseText"
-    },
-    {
-      "name": "C/C++ Runner: Debug Session",
-      "type": "cppdbg",
-      "request": "launch",
-      "args": [],
-      "stopAtEntry": false,
-      "externalConsole": false,
-      "cwd": "/home/ubuntu/pintos-kaist/devices",
-      "program": "/home/ubuntu/pintos-kaist/devices/build/Debug/outDebug",
-      "MIMode": "gdb",
-      "miDebuggerPath": "gdb",
-      "setupCommands": [
-        {
-          "description": "Enable pretty-printing for gdb",
-          "text": "-enable-pretty-printing",
-          "ignoreFailures": true
-        }
-      ]
-    }
+      {
+          "name": "(gdb) Project2 userprog Launch",
+          "type": "cppdbg",
+          "request": "launch",
+          "program": "${workspaceFolder}/userprog/build/kernel.o",
+          "args": [],
+          "stopAtEntry": false,
+          "cwd": "${workspaceFolder}/userprog/build",
+          "environment": [],
+          "externalConsole": false,
+          "MIMode": "gdb",
+          "setupCommands": [
+              {
+                  "description": "Enable pretty-printing for gdb",
+                  "text": "-enable-pretty-printing",
+                  "ignoreFailures": true
+              },
+              {
+                  "description": "Set Disassembly Flavor to Intel",
+                  "text": "-gdb-set disassembly-flavor intel",
+                  "ignoreFailures": true
+              }
+          ],
+          "miDebuggerServerAddress": "localhost:1234"
+      }
   ]
 }
+
+// {
+//   "configurations": [
+//     {
+//       "type": "gdb",
+//       "request": "attach",
+//       "name": "Attach to gdbserver : threads",
+//       "executable": "${workspaceRoot}/userprog/build/kernel.o",
+//       "target": "localhost:1234",
+//       "remote": true,
+//       "cwd": "${workspaceRoot}",
+//       "valuesFormatting": "parseText"
+//     },
+//     {
+//       "name": "C/C++ Runner: Debug Session",
+//       "type": "cppdbg",
+//       "request": "launch",
+//       "args": [],
+//       "stopAtEntry": false,
+//       "externalConsole": false,
+//       "cwd": "/home/ubuntu/pintos-kaist/devices",
+//       "program": "/home/ubuntu/pintos-kaist/devices/build/Debug/outDebug",
+//       "MIMode": "gdb",
+//       "miDebuggerPath": "gdb",
+//       "setupCommands": [
+//         {
+//           "description": "Enable pretty-printing for gdb",
+//           "text": "-enable-pretty-printing",
+//           "ignoreFailures": true
+//         }
+//       ]
+//     }
+//   ]
+// }
