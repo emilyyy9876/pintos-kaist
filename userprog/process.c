@@ -38,6 +38,11 @@ process_init (void) {
  * before process_create_initd() returns. Returns the initd's
  * thread id, or TID_ERROR if the thread cannot be created.
  * Notice that THIS SHOULD BE CALLED ONCE. */
+/* FILE_NAME에서 로드한 “initd”라는 첫 번째 유저랜드 프로그램을 시작합니다.
+ * 새 스레드는 스케줄링될 수 있으며 종료될 수도 있습니다.
+ * 프로세스_create_initd()가 반환되기 전에. initd의
+ * 스레드 ID를 반환하거나, 스레드를 생성할 수 없는 경우 TID_ERROR를 반환합니다.
+ * 이 함수는 한 번만 호출해야 합니다. */
 tid_t
 process_create_initd (const char *file_name) {
 	char *fn_copy;
@@ -160,6 +165,9 @@ error:
 
 /* Switch the current execution context to the f_name.
  * Returns -1 on fail. */
+/* 현재 실행 컨텍스트를 f_name으로 전환합니다.
+ * 실패 시 -1을 반환합니다. */
+// 시스템콜
 int
 process_exec (void *f_name) {
 	char *file_name = f_name;
@@ -204,6 +212,7 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	while(1) {}
 	return -1;
 }
 
@@ -329,16 +338,35 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
+	/* prj2- commandline passing*/
+	char *token;
+	char *save_ptr;
+	char *arg_list[64];
+	int argc = 0;
+	
+	token = strtok_r(file_name, " ", &save_ptr); // 첫 번째 토큰 가져오기
+    while (token != NULL) {
+        arg_list[argc] = token;
+        argc++;
+        token = strtok_r(NULL, " ", &save_ptr); // 다음 토큰 가져오기
+    }
+    
+    // // 결과 확인용
+    // for (int i = 0; i < argc; i++) {
+    //     printf("arg_list[%d]: %s\n", i, arg_list[i]);
+    // }
+
 	/* Allocate and activate page directory. */
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
 		goto done;
 	process_activate (thread_current ());
 
+	/* prj2- 파싱한 파일 이름인 arg_list의 첫번째 값을 open함수에 전달 */
 	/* Open executable file. */
-	file = filesys_open (file_name);
+	file = filesys_open (arg_list[0]);
 	if (file == NULL) {
-		printf ("load: %s: open failed\n", file_name);
+		printf ("load: %s: open failed\n", arg_list[0]);
 		goto done;
 	}
 

@@ -429,6 +429,7 @@ void test_max_priority (void){
 	struct list_elem *e = list_begin(&ready_list);
 	struct thread *t = list_entry(e, struct thread, elem);
 
+	// project2: 초기 설정 
 	if (t->priority > run_priority) {
 		if (intr_context())
 			intr_yield_on_return();
