@@ -3,8 +3,15 @@
 
 /* Copies SIZE bytes from SRC to DST, which must not overlap.
    Returns DST. */
-void *
-memcpy (void *dst_, const void *src_, size_t size) {
+//주어진 메모리의 한 영역에서 다른 영역으로 데이터를 복사하는 기능
+/*
+메모리 복사를 수행하는 함수
+지정된 크기만큼의 데이터를 한 메모리 영역에서 다른 메모리 영역으로 복사한다.
+dst_ : 목적지 주소, 
+src_ : 원본 메모리 주소
+size : 복사할 데이터 바이트 수
+*/
+void *memcpy (void *dst_, const void *src_, size_t size) {
 	unsigned char *dst = dst_;
 	const unsigned char *src = src_;
 
@@ -254,6 +261,10 @@ strtok_r (char *s, const char *delimiters, char **save_ptr) {
 }
 
 /* Sets the SIZE bytes in DST to VALUE. */
+/*
+	메모리의 특정 영역을 지정한 값으로 채우는 함수.
+	dst_라는 메모리 블록을 value 값으로 채우고 그 크기는 size 바이트이다.
+*/
 void *
 memset (void *dst_, int value, size_t size) {
 	unsigned char *dst = dst_;
@@ -298,8 +309,8 @@ strnlen (const char *string, size_t maxlen) {
    increasingly popular extension.  See
 http://www.courtesan.com/todd/papers/strlcpy.html for
 information on strlcpy(). */
-size_t
-strlcpy (char *dst, const char *src, size_t size) {
+//원본 문자열을 목적지로 복사하되, 버퍼의 크기를 초과하지 않도록 복사한 뒤, 문자열 끝에 널('\0') 문자를 추가
+size_t strlcpy (char *dst, const char *src, size_t size) {
 	size_t src_len;
 
 	ASSERT (dst != NULL);

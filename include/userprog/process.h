@@ -10,4 +10,9 @@ int process_wait (tid_t);
 void process_exit (void);
 void process_activate (struct thread *next);
 
+// 
+void setup_argument(char **argv_list,int argc_num, struct intr_frame *if_);
+
+
+
 #endif /* userprog/process.h */
