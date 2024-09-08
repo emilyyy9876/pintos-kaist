@@ -699,18 +699,15 @@ setup_stack(struct intr_frame *if_)
 // ====================================================== functions ======================================================
 void setup_argument(char **argv_list,int argc_num, struct intr_frame *if_)
 {
-	printf("== setup_argument들어옴\n");
 	/*
-		1. file_name을 parsing 해준다.
-		2. parsing한 것들의 size를 계산한다.
-		3. parsing 한 것들이 size가 8 바이트를 넘어가면 블록 2개를 처리해야한다.
-		4. 모든인자들의 값의 크기를 더한 후 8의 배수를 맞춰서 부족한 만큼 0값으로 align을 맞춰준다.
-		5. argv[argc] = 0 이므로 0 값을 memset으로 sizeof(char *) 만큼 채운다.
-		6. argv[1], argv[0] 을 순서대로 채운다.
-		7. fake return address 0 을 sizeof(void * ) memset한다.
+		1. parsing 된 인자를 argv_list로 받음
+		2. 리스트의 각 요소의 size를 계산하여 rsp를 1칸 씩 내리며 문자열 push
+		3. 스택 영역 8의 배수로 맞춰주기 padding
+		4. 문자열 종료 알려주기 위한 memset 
+		5. 문자열의 주소 push
+		6. fake return addr 
 
 		x = (x + 7) & ~7; 8의 배수
-
 	*/
 
 
@@ -720,24 +717,24 @@ void setup_argument(char **argv_list,int argc_num, struct intr_frame *if_)
     {
         for (int j = strlen(argv_list[i]); j > -1; j--)
         {
-            if_->rsp -= 8;                  // 스택 주소 감소
-            *(char *)if_->rsp = argv_list[i][j]; // 주소에 문자 저장
+            if_->rsp -= 1;                  
+            *(char *)if_->rsp = argv_list[i][j]; 
         }
-        argv_list[i] = (char *)if_->rsp; // parse[i]에 현재 rsp의 값 저장해둠(지금 저장한 인자가 시작하는 주소값)
+		// if_->rsp -= 8;                 
+		// memcpy(if_->rsp, &(&argv_list[i]), strlen(argv_list[i]));
+        argv_list[i] = (char *)if_->rsp; 
     }
 
 
-    // 정렬 패딩 push
+    // 스택 영역 정렬 패딩 push
     int padding = (int)if_->rsp % 8;
-    for (int i = 0; i < padding; i++)
-    {
-        if_->rsp -= 8;
-       *(uint8_t  *)if_->rsp = 0; // rsp 직전까지 값 채움
-    }
+	if_->rsp -= padding;
+	memset(if_->rsp, '\0', padding);
+
 
     // 인자 문자열 종료를 나타내는 0 push
    	if_->rsp -= 8;
-    *(char ***)if_->rsp = 0; // char* 타입의 0 추가
+	memset(if_->rsp, '\0', 8);
 
 
 
@@ -745,12 +742,12 @@ void setup_argument(char **argv_list,int argc_num, struct intr_frame *if_)
     for (int i = argc_num - 1; i > -1; i--)
     {
         if_->rsp -= 8; // 다음 주소로 이동
-        *(char ***)if_->rsp = argv_list[i]; // char* 타입의 주소 추가
+		memcpy(if_->rsp, &argv_list[i], sizeof(char *));
     }
 
     // return address push
      if_->rsp -= 8;
-    *(void ***)if_->rsp = 0; // void* 타입의 0 추가
+	memset(if_->rsp, '\0', sizeof(void *));
 
 
 
@@ -762,89 +759,4 @@ void setup_argument(char **argv_list,int argc_num, struct intr_frame *if_)
 
 
 	hex_dump(if_->rsp, if_->rsp, USER_STACK - (uint64_t)if_->rsp, true); // user stack을 16진수로 프린트
-
-
-
-	// char *argv_list[128];
-	// char *token, *save_ptr;
-	// int argc = 0;
-
-	// token = strtok_r(file_name, " ", &save_ptr); // 첫번째 이름
-	// argv_list[argc] = token;					 // arg_list[0] = file_name_first
-	// // argc ++;
-	// while (token != NULL)
-	// {
-	// 	token = strtok_r(NULL, " ", &save_ptr);
-	// 	argc++;
-	// 	argv_list[argc] = token;
-	// }
-
-	// int i = 0;
-	// int total_size = 0;
-	// while (i < argc)
-	// {
-	// 	size_t size = strlen(argv_list[i])+1;
-	// 	total_size += size;
-
-	// 	if_->rsp -= size;
-	// 	memcpy(if_->rsp, argv_list[i], size);
-
-	// 	// if (size > 8)
-	// 	// {
-	// 	// 	// void *cur_ptr = memcpy(if_->rsp, argv_list[i], size);
-	// 	// 	if (size % 8 == 0)
-	// 	// 	{
-	// 	// 		if_->rsp -= 8 * (size / 8);
-	// 	// 		memcpy(if_->rsp, argv_list[i], size);
-	// 	// 	}
-	// 	// 	else
-	// 	// 	{
-	// 	// 		if_->rsp -= 8 * ((size / 8) + 1);
-	// 	// 		void *cur_ptr = memcpy(if_->rsp, argv_list[i], size);
-	// 	// 		memset((cur_ptr + size), '\0', (8 - (size % 8)));
-	// 	// 	}
-	// 	// }
-	// 	// else
-	// 	// {
-	// 	// 	if_->rsp -= 8;
-	// 	// 	i = strlcpy(if_->rsp, argv_list[i], 8);
-	// 	// 	memset(if_->rsp, '\0', 8 - i);
-	// 	// }
-	// 	i++;
-	// }
-	
-	// if_->rsp -= 8;
-	// if (total_size % 8 == 0){
-	// 	memset(if_->rsp, '\0', 8);
-	// }else{
-	// 	if_->rsp -= 8 * ((total_size / 8) + 1);
-	// }
-
-
-	
-
-	// // word - align
-	// // if_->rsp -= 8;
-	// // memset(if_->rsp, '\0', 8);
-	// // argv[argc]  = 0
-	// if_->rsp -= 8;
-	// memset(if_->rsp, '\0', sizeof(char *));
-
-	// // argv pointer
-	// i = 0;
-	// while (i < argc)
-	// {
-	// 	if_->rsp -= 8;
-	// 	void *cur_pptr = memcpy(if_->rsp, &argv_list[i], sizeof(char **));
-	// 	i++;
-	// }
-
-
-	// /* fake return address */
-	// if_->rsp = if_->rsp - 8; // void 포인터도 8바이트 크기
-	// memset(if_->rsp, 0, sizeof(void *));
-
-	// if_->R.rdi = argc;
-	// if_->R.rsi = if_->rsp + 8; // fake_address 바로 위: arg_address 맨 앞 가리키는 주소값!
-	// // 0x4747ffa5
 }
