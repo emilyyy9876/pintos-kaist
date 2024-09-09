@@ -13,6 +13,7 @@ void process_activate (struct thread *next);
 // 
 void setup_argument(char **argv_list,int argc_num, struct intr_frame *if_);
 
-
+static int64_t
+get_user (const uint8_t *uaddr);
 
 #endif /* userprog/process.h */

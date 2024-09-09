@@ -130,6 +130,7 @@ pgdir_for_each (uint64_t *pdp, pte_for_each_func *func, void *aux,
 	return true;
 }
 
+
 static bool
 pdp_for_each (uint64_t *pdp,
 		pte_for_each_func *func, void *aux, unsigned pml4_index) {
@@ -144,6 +145,11 @@ pdp_for_each (uint64_t *pdp,
 }
 
 /* Apply FUNC to each available pte entries including kernel's. */
+/*
+커널을 포함하여 사용 가능한 각 pte 항목에 FUNC를 적용합니다.
+페이지 테이블을 순회하면서 각 엔트리에 대해 함수를 적용하여 각 항목이 유효한지 확인하고
+다음 단계의 페이지 테이블로 내려가 해당 페이지 테이블의 항목들을 처리
+*/ 
 bool
 pml4_for_each (uint64_t *pml4, pte_for_each_func *func, void *aux) {
 	for (unsigned i = 0; i < PGSIZE / sizeof(uint64_t *); i++) {

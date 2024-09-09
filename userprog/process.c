@@ -16,6 +16,7 @@
 #include "threads/palloc.h"
 #include "threads/thread.h"
 #include "threads/mmu.h"
+#include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
 #ifdef VM
@@ -26,6 +27,72 @@ static void process_cleanup(void);
 static bool load(const char *file_name, struct intr_frame *if_);
 static void initd(void *f_name);
 static void __do_fork(void *);
+
+
+// ===================================================================================================
+/* We load ELF binaries.  The following definitions are taken
+ * from the ELF specification, [ELF1], more-or-less verbatim.  */
+
+/* ELF types.  See [ELF1] 1-2. */
+#define EI_NIDENT 16
+
+#define PT_NULL 0			/* Ignore. */
+#define PT_LOAD 1			/* Loadable segment. */
+#define PT_DYNAMIC 2		/* Dynamic linking info. */
+#define PT_INTERP 3			/* Name of dynamic loader. */
+#define PT_NOTE 4			/* Auxiliary info. */
+#define PT_SHLIB 5			/* Reserved. */
+#define PT_PHDR 6			/* Program header table. */
+#define PT_STACK 0x6474e551 /* Stack segment. */
+
+#define PF_X 1 /* Executable. */
+#define PF_W 2 /* Writable. */
+#define PF_R 4 /* Readable. */
+
+/* Executable header.  See [ELF1] 1-4 to 1-8.
+ * This appears at the very beginning of an ELF binary. */
+struct ELF64_hdr
+{
+	unsigned char e_ident[EI_NIDENT];
+	uint16_t e_type;
+	uint16_t e_machine;
+	uint32_t e_version;
+	uint64_t e_entry;
+	uint64_t e_phoff;
+	uint64_t e_shoff;
+	uint32_t e_flags;
+	uint16_t e_ehsize;
+	uint16_t e_phentsize;
+	uint16_t e_phnum;
+	uint16_t e_shentsize;
+	uint16_t e_shnum;
+	uint16_t e_shstrndx;
+};
+
+struct ELF64_PHDR
+{
+	uint32_t p_type;
+	uint32_t p_flags;
+	uint64_t p_offset;
+	uint64_t p_vaddr;
+	uint64_t p_paddr;
+	uint64_t p_filesz;
+	uint64_t p_memsz;
+	uint64_t p_align;
+};
+
+/* Abbreviations */
+#define ELF ELF64_hdr
+#define Phdr ELF64_PHDR
+
+static bool setup_stack(struct intr_frame *if_);
+static bool validate_segment(const struct Phdr *, struct file *);
+static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
+						 uint32_t read_bytes, uint32_t zero_bytes,
+						 bool writable);
+						 
+// ===================================================================================================
+
 
 /* General process initializer for initd and other process. */
 static void
@@ -84,6 +151,7 @@ initd(void *f_name)
  * TID_ERROR if the thread cannot be created. */
 tid_t process_fork(const char *name, struct intr_frame *if_ UNUSED)
 {
+
 	/* Clone current thread to new thread.*/
 	return thread_create(name,
 						 PRI_DEFAULT, __do_fork, thread_current());
@@ -184,12 +252,17 @@ int process_exec(void *f_name)
 	_if.ds = _if.es = _if.ss = SEL_UDSEG;
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
+	
 
 	/* We first kill the current context */
 	process_cleanup();
 
 	/* And then load the binary */
 	success = load(file_name, &_if);
+
+	// if(success){
+	//	sema_up;
+	//}
 
 	/* If load failed, quit. */
 	palloc_free_page(file_name);
@@ -215,6 +288,50 @@ int process_wait(tid_t child_tid UNUSED)
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	/*
+	child에서 process_exit 호출될 때 까지 parent를 멈춰놓고 
+	child 의 exit code가 결정되면 이를 parent에게 넘겨준 뒤 child는 종료된다.
+	
+	parent는 0으로 초기화된 semaphore A를 down하면서 block된다. 
+	child는 process_exit까지 당도했으면, sema A를 sema_up하면서 parent에게
+	주도권을 넘긴다. 때문에 child를 잠시 block시키기 위해 또 다른 0으로 초기화된 
+	semaphore B를 child에게 down하면서 block된다. 
+	이렇게하면 parent가 주도권을 잡아 child의 exit code를 알아내는 것이 가능하다.
+	exit code를 알아낸 뒤 parent는 sema B를 sema_up해주면 child가 종료된다.
+	*/
+
+	// struct Phdr *phdr;
+	// if (is_user_vaddr(phdr->p_vaddr)){
+
+	// }
+
+	// parent thread sema down
+	// sema_down(tid);
+	// child는 sema down상태이므로 exit되면 
+	// parent가 sema up을 해준다. 이렇게 되어 terminate된다.
+
+
+
+	// struct lock a, b;
+	
+	// lock_init (&a);
+ 	// lock_init (&b);
+
+	// // lock을 init하면서 value가 1로 초기화됐는데 지금 현재 0인지 확인하기
+	// sema_down(&a.semaphore);
+
+
+	// if(get_user(rsp) <KERN_BASE){
+
+	// }
+
+
+
+
+
+
+
+
 	while(1){
 		
 	}
@@ -229,6 +346,9 @@ void process_exit(void)
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
+
+	// parent thread sema up
+	//sema_up(t->tid); t = thread_current() 
 
 	process_cleanup();
 }
@@ -273,66 +393,7 @@ void process_activate(struct thread *next)
 	tss_update(next);
 }
 
-/* We load ELF binaries.  The following definitions are taken
- * from the ELF specification, [ELF1], more-or-less verbatim.  */
-
-/* ELF types.  See [ELF1] 1-2. */
-#define EI_NIDENT 16
-
-#define PT_NULL 0			/* Ignore. */
-#define PT_LOAD 1			/* Loadable segment. */
-#define PT_DYNAMIC 2		/* Dynamic linking info. */
-#define PT_INTERP 3			/* Name of dynamic loader. */
-#define PT_NOTE 4			/* Auxiliary info. */
-#define PT_SHLIB 5			/* Reserved. */
-#define PT_PHDR 6			/* Program header table. */
-#define PT_STACK 0x6474e551 /* Stack segment. */
-
-#define PF_X 1 /* Executable. */
-#define PF_W 2 /* Writable. */
-#define PF_R 4 /* Readable. */
-
-/* Executable header.  See [ELF1] 1-4 to 1-8.
- * This appears at the very beginning of an ELF binary. */
-struct ELF64_hdr
-{
-	unsigned char e_ident[EI_NIDENT];
-	uint16_t e_type;
-	uint16_t e_machine;
-	uint32_t e_version;
-	uint64_t e_entry;
-	uint64_t e_phoff;
-	uint64_t e_shoff;
-	uint32_t e_flags;
-	uint16_t e_ehsize;
-	uint16_t e_phentsize;
-	uint16_t e_phnum;
-	uint16_t e_shentsize;
-	uint16_t e_shnum;
-	uint16_t e_shstrndx;
-};
-
-struct ELF64_PHDR
-{
-	uint32_t p_type;
-	uint32_t p_flags;
-	uint64_t p_offset;
-	uint64_t p_vaddr;
-	uint64_t p_paddr;
-	uint64_t p_filesz;
-	uint64_t p_memsz;
-	uint64_t p_align;
-};
-
-/* Abbreviations */
-#define ELF ELF64_hdr
-#define Phdr ELF64_PHDR
-
-static bool setup_stack(struct intr_frame *if_);
-static bool validate_segment(const struct Phdr *, struct file *);
-static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
-						 uint32_t read_bytes, uint32_t zero_bytes,
-						 bool writable);
+// ==========================================================================================  Phdr 원래자리
 
 /* Loads an ELF executable from FILE_NAME into the current thread.
  * Stores the executable's entry point into *RIP
@@ -450,20 +511,14 @@ load(const char *file_name, struct intr_frame *if_)
 		goto done;
 
 
-
-	// int c = strlcat(token,save_ptr,strlen(token)+strlen(save_ptr)+2);
-	// token = strtok_r(NULL," ", &save_ptr);
-
-	// set up argument
+	// stack memory push
 	setup_argument(argv_list,agrc_num, if_);
 
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
-	// 0x400c7f
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-	// register 조절하기
 
 	success = true;
 
@@ -709,9 +764,6 @@ void setup_argument(char **argv_list,int argc_num, struct intr_frame *if_)
 
 		x = (x + 7) & ~7; 8의 배수
 	*/
-
-
-
     // 프로그램 이름, 인자 문자열 push
     for (int i = argc_num - 1; i > -1; i--)
     {
@@ -720,28 +772,24 @@ void setup_argument(char **argv_list,int argc_num, struct intr_frame *if_)
             if_->rsp -= 1;                  
             *(char *)if_->rsp = argv_list[i][j]; 
         }
-		// if_->rsp -= 8;                 
-		// memcpy(if_->rsp, &(&argv_list[i]), strlen(argv_list[i]));
+		// if_->rsp -= strlen(argv_list[i])+1;                 
+		// memcpy(if_->rsp, &(&argv_list[i]), strlen(argv_list[i])+1);
         argv_list[i] = (char *)if_->rsp; 
     }
-
 
     // 스택 영역 정렬 패딩 push
     int padding = (int)if_->rsp % 8;
 	if_->rsp -= padding;
 	memset(if_->rsp, '\0', padding);
 
-
     // 인자 문자열 종료를 나타내는 0 push
    	if_->rsp -= 8;
 	memset(if_->rsp, '\0', 8);
 
-
-
     // 각 인자 문자열의 주소 push
     for (int i = argc_num - 1; i > -1; i--)
     {
-        if_->rsp -= 8; // 다음 주소로 이동
+        if_->rsp -= 8;
 		memcpy(if_->rsp, &argv_list[i], sizeof(char *));
     }
 
@@ -749,14 +797,24 @@ void setup_argument(char **argv_list,int argc_num, struct intr_frame *if_)
      if_->rsp -= 8;
 	memset(if_->rsp, '\0', sizeof(void *));
 
-
-
-
 	if_->R.rdi = argc_num;
 	if_->R.rsi = if_->rsp + 8; // fake_address 바로 위: arg_address 맨 앞 가리키는 주소값!
 
-
-
-
 	hex_dump(if_->rsp, if_->rsp, USER_STACK - (uint64_t)if_->rsp, true); // user stack을 16진수로 프린트
+}
+
+
+/* Reads a byte at user virtual address UADDR.
+ * UADDR must be below KERN_BASE.
+ * Returns the byte value if successful, -1 if a segfault
+ * occurred. */
+static int64_t
+get_user (const uint8_t *uaddr) {
+    int64_t result;
+    __asm __volatile (
+    "movabsq $done_get, %0\n"
+    "movzbq %1, %0\n"
+    "done_get:\n"
+    : "=&a" (result) : "m" (*uaddr));
+    return result;
 }

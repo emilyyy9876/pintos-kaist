@@ -82,6 +82,14 @@ exit (int status) {
 
 pid_t
 fork (const char *thread_name){
+		/*
+	return tid (child process tid)
+	
+	wait for child copy resource
+	child process create success -> child return 0
+	child have to copy fd and vm  
+
+	 */
 	return (pid_t) syscall1 (SYS_FORK, thread_name);
 }
 
@@ -194,3 +202,6 @@ int
 umount (const char *path) {
 	return syscall1 (SYS_UMOUNT, path);
 }
+
+
+// ================= functions =================
