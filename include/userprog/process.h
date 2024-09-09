@@ -9,5 +9,7 @@ int process_exec (void *f_name);
 int process_wait (tid_t);
 void process_exit (void);
 void process_activate (struct thread *next);
+// Project2 arg passing
+void argument_stack(char **arg_list, int cnt, struct intr_frame *if_);
 
 #endif /* userprog/process.h */

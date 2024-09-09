@@ -55,6 +55,10 @@ process_create_initd (const char *file_name) {
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
 
+	// Project2 arg passing: 파일 이름만 전달
+	char *save_ptr;
+	strtok_r(file_name, " ", &save_ptr);
+
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
 	if (tid == TID_ERROR)
@@ -325,6 +329,43 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes,
 		bool writable);
 
+/* Project2 arg passing - 인자를 유저 스택에 담아주는 함수 */
+void
+argument_stack(char **argv, int argc, struct intr_frame *if_) {
+	size_t sum = 0;
+	char *argv_address[64]; //
+	for(int i = argc-1; i>=0; i--) {
+		size_t len = strlen(argv[i])+1; // 문자열 끝을 나타내는 '\0'을 포함하기위해서 +1
+		if_->rsp = if_->rsp - len; // 문자열크기 + sentinel(1) 값까지 포함하여 공간만큼 rsp를 내려주고
+		memcpy(if_->rsp, argv[i], len); // intr_frame에 계속 memcpy
+		argv_address[i] = if_->rsp-sum; // 주소값을 계산해서 저장
+	}
+
+	// padding - rsp를 8바이트 경계로 맞추기
+	while (if_->rsp % 8 != 0) {
+		if_->rsp--;
+		*(uint8_t *)if_->rsp = 0; //1바이트로 형변환하고 값을 0으로 저장
+	}
+
+	// arg_address 배열 주소값을 스택에 담기
+	for(int i = argc; i >= 0; i--) {
+		if_->rsp = if_->rsp - 8;
+		if(i == argc) { // 오류 예방을 위해서 해당 공간을 0으로 초기화
+			memset(if_->rsp, 0, sizeof(char **));
+		} else { //stack에 arg_address에 담긴 주소값 저장
+			memcpy(if_->rsp, &argv_address[i], sizeof(char **));
+		}
+	}
+
+	if_->rsp = if_->rsp - 8; // rsp를 fake return address까지 이동
+	memset(if_->rsp, 0, sizeof(void *)); // fake return를 0으로 초기화
+
+		// rsi 에 argv의 주소(argv[0]), rdi에 argc(count)
+	if_->R.rdi = argc;
+	if_->R.rsi = (char *)if_->rsp+8;
+}
+
+
 /* Loads an ELF executable from FILE_NAME into the current thread.
  * Stores the executable's entry point into *RIP
  * and its initial stack pointer into *RSP.
@@ -338,22 +379,22 @@ load (const char *file_name, struct intr_frame *if_) {
 	bool success = false;
 	int i;
 
-	/* prj2- commandline passing*/
+	/* Project2 arg passing - commandline parsing*/
 	char *token;
 	char *save_ptr;
-	char *arg_list[64];
+	char *argv[64]; // 64로 지정하는 커맨드라인 최대 128바이트라서?
 	int argc = 0;
 	
 	token = strtok_r(file_name, " ", &save_ptr); // 첫 번째 토큰 가져오기
     while (token != NULL) {
-        arg_list[argc] = token;
+        argv[argc] = token;
         argc++;
         token = strtok_r(NULL, " ", &save_ptr); // 다음 토큰 가져오기
     }
     
     // // 결과 확인용
     // for (int i = 0; i < argc; i++) {
-    //     printf("arg_list[%d]: %s\n", i, arg_list[i]);
+    //     printf("argv[%d]: %s\n", i, argv[i]);
     // }
 
 	/* Allocate and activate page directory. */
@@ -362,11 +403,11 @@ load (const char *file_name, struct intr_frame *if_) {
 		goto done;
 	process_activate (thread_current ());
 
-	/* prj2- 파싱한 파일 이름인 arg_list의 첫번째 값을 open함수에 전달 */
+	/* Project2 arg passing - 파싱한 파일 이름인 arg_list의 첫번째 값을 open함수에 전달 */
 	/* Open executable file. */
-	file = filesys_open (arg_list[0]);
+	file = filesys_open (argv[0]);
 	if (file == NULL) {
-		printf ("load: %s: open failed\n", arg_list[0]);
+		printf ("load: %s: open failed\n", argv[0]);
 		goto done;
 	}
 
@@ -445,6 +486,12 @@ load (const char *file_name, struct intr_frame *if_) {
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
 
+	/* Project2 arg passing - 인자를 유저 스택에 담아주기 */
+	argument_stack(argv, argc, if_);
+
+	// 스택 확인용 함수 0x4747ffc8 확인
+	hex_dump(if_->rsp, if_->rsp, USER_STACK - (uint64_t)if_->rsp, true);
+
 	success = true;
 
 done:
@@ -452,6 +499,7 @@ done:
 	file_close (file);
 	return success;
 }
+
 
 
 /* Checks whether PHDR describes a valid, loadable segment in
