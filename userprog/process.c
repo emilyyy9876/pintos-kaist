@@ -22,6 +22,8 @@
 #include "vm/vm.h"
 #endif
 
+
+
 static void process_cleanup (void);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
@@ -49,6 +51,9 @@ process_create_initd (const char *file_name) {
 	if (fn_copy == NULL)
 		return TID_ERROR;
 	strlcpy (fn_copy, file_name, PGSIZE);
+
+	char *save_ptr;
+	strtok_r(file_name, " ", &save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
 	tid = thread_create (file_name, PRI_DEFAULT, initd, fn_copy);
@@ -204,7 +209,9 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	return -1;
+	for(int i = 0; i < 1000000000; i++){}
+
+  	return -1;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -320,6 +327,11 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
  * Stores the executable's entry point into *RIP
  * and its initial stack pointer into *RSP.
  * Returns true if successful, false otherwise. */
+
+size_t align_up(size_t n) {
+    return (n + 7) & ~7;
+}
+
 static bool
 load (const char *file_name, struct intr_frame *if_) {
 	struct thread *t = thread_current ();
@@ -334,6 +346,22 @@ load (const char *file_name, struct intr_frame *if_) {
 	if (t->pml4 == NULL)
 		goto done;
 	process_activate (thread_current ());
+
+	char *arg_list[128];
+	char *args, *save_ptr;
+	int argc = 0;
+
+    args = strtok_r(file_name, " ", &save_ptr);
+	arg_list[argc] = args;
+
+	while (args != NULL)
+	{
+		args = strtok_r(NULL, " ", &save_ptr);
+		argc++;
+		arg_list[argc] = args;
+	}
+
+	file_name = arg_list[0];
 
 	/* Open executable file. */
 	file = filesys_open (file_name);
@@ -411,13 +439,15 @@ load (const char *file_name, struct intr_frame *if_) {
 	if (!setup_stack (if_))
 		goto done;
 
+	setup_argument(arg_list , argc, if_);
+
 	/* Start address. */
 	if_->rip = ehdr.e_entry;
 
-	/* TODO: Your code goes here.
-	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+	hex_dump(if_->rsp, if_->rsp, USER_STACK - if_->rsp, true); // user stack을 프린트
 
 	success = true;
+
 
 done:
 	/* We arrive here whether the load is successful or not. */
@@ -425,6 +455,51 @@ done:
 	return success;
 }
 
+
+void setup_argument(char **arg_list, int argc, struct intr_frame *if_){
+	// stack에 파일 이름이랑 인자 쌓기, 인자들의 주소도 args_address_list 리스트로 저장
+	char *arg_address_list[128];
+	int length;
+
+	// 프로그램 이름, 인자 문자열 push
+	for(int i = argc - 1; i >= 0; i--){
+		length = strlen(arg_list[i]) + 1;
+
+		if_->rsp -= length;
+
+		strlcpy(if_->rsp, arg_list[i], length);
+
+		arg_address_list[i] = if_->rsp;	// 현재 rsp값(주소) 저장해두기
+	}
+
+	// 정렬 패딩 push
+	uint8_t padding = if_->rsp % 8;
+
+	if(padding != 0){
+		if_->rsp -= padding;
+		memset(if_->rsp, 0, padding);
+	}
+
+	//각 인자 문자열의 주소 push
+	for(int i = argc; i >= 0; i--){
+		length = sizeof(char **);
+
+		if_->rsp -= length;
+
+		if(i == argc) {
+			memset(if_->rsp, 0, length);
+		} else {
+			strlcpy(if_->rsp, &arg_address_list[i], length);
+		}
+	}
+
+	// return address push
+	if_->rsp -= 8;
+	memset(if_->rsp, 0, sizeof(void *));
+
+	if_->R.rdi = argc;
+	if_->R.rsi = if_->rsp + 8;
+}
 
 /* Checks whether PHDR describes a valid, loadable segment in
  * FILE and returns true if so, false otherwise. */
