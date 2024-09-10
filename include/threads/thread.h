@@ -110,6 +110,7 @@ struct thread {
 	/*----------------------------Project 2 fd --------------------------------*/
 	struct file **fdt; // fd 테이블
 	int next_fd; // 다음 fd 인덱스
+	int exit_status; // exit 함수 구현
 
 
 #ifdef USERPROG

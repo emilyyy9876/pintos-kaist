@@ -12,7 +12,7 @@ void process_activate (struct thread *next);
 /*----------------------------Project 2 arg passing -----------------------*/
 void argument_stack(char **arg_list, int cnt, struct intr_frame *if_);
 /*----------------------------Project 2 fd --------------------------------*/
-void process_add_file(struct file *f);
-void process_get_file(int fd);
+int process_add_file(struct file *f);
+struct file *process_get_file(int fd);
 
 #endif /* userprog/process.h */

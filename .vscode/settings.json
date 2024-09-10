@@ -64,6 +64,10 @@
     "synch.h": "c",
     "list.h": "c",
     "*.inc": "c",
-    "debug.h": "c"
+    "debug.h": "c",
+    "filesys.h": "c",
+    "intrinsic.h": "c",
+    "file.h": "c",
+    "process.h": "c"
   }
 }
