@@ -329,7 +329,9 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes,
 		bool writable);
 
-/* Project2 arg passing - 인자를 유저 스택에 담아주는 함수 */
+/*----------------------------Project 2 arg passing -----------------------*/
+
+// Project2 arg passing - 인자를 유저 스택에 담아주는 함수
 void
 argument_stack(char **argv, int argc, struct intr_frame *if_) {
 	size_t sum = 0;
@@ -365,6 +367,43 @@ argument_stack(char **argv, int argc, struct intr_frame *if_) {
 	if_->R.rsi = (char *)if_->rsp+8;
 }
 
+/*----------------------------Project 2 fd --------------------------------*/
+// 스레드가 가진 fd 테이블에 파일을 추가하고, 그 파일의 fd를 리턴하는 함수
+int process_add_file(struct file *f) {
+	struct thread *curr = thread_current();
+	struct file **fdt = curr->fdt;
+
+	// 파일 디스크립터의 개수 리밋을 넘지않고, 
+	// fd 테이블에서 현재의 다름 fd가 할당되어 있을 때 다음 빈자리 찾기 위해 next_fd++ 해주기
+	while(curr->next_fd < FDT_COUNT_LIMIT && fdt[curr->next_fd]) {
+		curr->next_fd++;
+	}
+
+	// 리밋을 넘으면 -1 리턴
+	if(curr->next_fd >= FDT_COUNT_LIMIT) {
+		return -1;
+	}
+
+	// 빈자리를 찾았으니 주어진 파일을 next_fd로 지정
+	fdt[curr->next_fd] = f;
+
+	return curr->next_fd;
+}
+
+// 파일을 검색하는 함수
+struct file *process_get_file(int fd) {
+	struct thread *curr = thread_current();
+	struct file **fdt = curr->fdt;
+	
+	// fd는 2부터 시작, 그리고 리밋을 넘지않음, 두 조건을 만족하지 못한다면 -1리턴
+	if(fd < 2 && fd >= FDT_COUNT_LIMIT) {
+		return -1;
+	}
+	
+	// 해당 파일 리턴
+	return fdt[fd];
+}
+/*----------------------------Project 2 fd --------------------------------*/
 
 /* Loads an ELF executable from FILE_NAME into the current thread.
  * Stores the executable's entry point into *RIP

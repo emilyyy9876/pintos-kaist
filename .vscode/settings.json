@@ -62,6 +62,8 @@
     "tests.h": "c",
     "stdbool.h": "c",
     "synch.h": "c",
-    "list.h": "c"
+    "list.h": "c",
+    "*.inc": "c",
+    "debug.h": "c"
   }
 }

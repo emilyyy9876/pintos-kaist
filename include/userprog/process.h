@@ -9,7 +9,10 @@ int process_exec (void *f_name);
 int process_wait (tid_t);
 void process_exit (void);
 void process_activate (struct thread *next);
-// Project2 arg passing
+/*----------------------------Project 2 arg passing -----------------------*/
 void argument_stack(char **arg_list, int cnt, struct intr_frame *if_);
+/*----------------------------Project 2 fd --------------------------------*/
+void process_add_file(struct file *f);
+void process_get_file(int fd);
 
 #endif /* userprog/process.h */

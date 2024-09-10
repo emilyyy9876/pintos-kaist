@@ -28,6 +28,10 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
+/*----------------------------Project 2 fd --------------------------------*/
+#define FDT_PAGES 2 // 파일디스크립터 테이블 페이지 수(페이지당 4KB)
+#define FDT_COUNT_LIMIT 128 // 파일디스크립터 테이블에서 관리할 수 있는 최대 파일 디스크립터 수
+
 /* A kernel thread or user process.
  *
  * Each thread structure is stored in its own 4 kB page.  The
@@ -103,7 +107,9 @@ struct thread {
 	struct list_elem donation_elem;
 	struct lock *wait_on_lock; // 기다리고 있는 lock
 	
-	
+	/*----------------------------Project 2 fd --------------------------------*/
+	struct file **fdt; // fd 테이블
+	int next_fd; // 다음 fd 인덱스
 
 
 #ifdef USERPROG

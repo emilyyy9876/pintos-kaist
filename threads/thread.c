@@ -298,6 +298,12 @@ thread_create (const char *name, int priority,	// 새로운 커널 스레드를 
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+	/*----------------------------Project 2 fd --------------------------------*/
+	t->fdt = palloc_get_multiple(PAL_ZERO, FDT_PAGES); // fdt 초기화
+
+	if(t->fdt == NULL) {
+		return TID_ERROR;
+	}
 
 	/* Add to run queue. */
 	thread_unblock (t);
@@ -537,6 +543,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->magic = THREAD_MAGIC;
     t->wait_on_lock = NULL;
     list_init(&(t->donations));
+	/*----------------------------Project 2 fd --------------------------------*/
+	t->next_fd = 2; // 0, 1은 테이블에서 stdin/stdout이 이미 사용 중
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
