@@ -22,6 +22,12 @@ void exit_handler(int status);
 bool create_handler(const char *file, unsigned initial_size);
 bool remove_handler(const char *file);
 int open_handler(const char *file);
+int filesize_handler(int fd);
+int read_handler(int fd, void *buffer, unsigned size);
+int write_handler(int fd, const void *buffer, unsigned size);
+void seek_handler(int fd, unsigned position);
+unsigned tell_handler(int fd);
+void close(int fd);
 
 /* System call.
  *
@@ -99,16 +105,17 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			f->R.rax = write_handler(f->R.rdi,f->R.rsi, f->R.rdx);
 			break;		
 		case SYS_SEEK:
-			f->R.rax = seek_handler(f->R.rdi,f->R.rsi);
+			seek_handler(f->R.rdi,f->R.rsi);
 			break;		
 		case SYS_TELL:
 			f->R.rax = tell_handler(f->R.rdi);
 			break;		
 		case SYS_CLOSE:
-			f->R.rax = close_handler(f->R.rdi,f->R.rsi);
+			close_handler(f->R.rdi);
 			break;		
 		default:
 			exit(-1);
+			break;
 	}
 }
 
@@ -222,35 +229,37 @@ int write_handler(int fd, const void *buffer, unsigned size) {
 void seek_handler(int fd, unsigned position) {
 	struct file *file = process_get_file(fd);
 	if(file == NULL) {
-		return -1;
+		return;
 	}
-	if(file <= 1) {
-		return -1;
+	if(fd <= 1) {
+		return;
 	}
 
 	file_seek(file, position);
 }
 
-unsigned tell_handler(int fd, const void *buffer, unsigned size) {
+unsigned tell_handler(int fd) {
 	struct file *file = process_get_file(fd);
 
 	if(file == NULL) {
-		return -1;
+		return;
 	}
-	if(file <= 1) {
-		return -1;
+	if(fd <= 1) {
+		return;
 	}
+
+	file_tell(file);
 }
 
 void close(int fd) {
 	struct file *file= process_get_file(fd);
 
 	if(file == NULL) {
-		return -1;
+		return;
 	}
 
-	if(file <= 1) {
-		return -1;
+	if(fd <= 1) {
+		return;
 	}
 
 	remove_file_from_fdt(fd);
