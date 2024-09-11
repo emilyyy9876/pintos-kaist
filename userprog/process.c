@@ -18,6 +18,7 @@
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -85,8 +86,14 @@ initd (void *f_name) {
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+	// parent tf를 저장 
+	struct thread *parent = thread_current();
+	memcpy(&parent->parent_tf, if_, sizeof(struct intr_frame));
+
+	// sema down
+	sema_down(&thread_current()->wait_sema);
+	// 새로운(child) 쓰레드에 현재(parent) 쓰레드 복사
+	thread_create (name, PRI_DEFAULT, __do_fork, parent);
 }
 
 #ifndef VM
@@ -101,21 +108,37 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	bool writable;
 
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
+	if(is_kernel_vaddr(va)) {
+		return true;
+	}
 
 	/* 2. Resolve VA from the parent's page map level 4. */
+	// 물리적 주소를 조회하는 함수로 커널 가상주소 찾기
 	parent_page = pml4_get_page (parent->pml4, va);
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
+	newpage = palloc_get_page(PAL_USER);
+	bool success;
+	if(newpage == NULL) {
+		return false;
+	}
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
+	if(newpage != NULL) {
+		memcpy(&newpage, &parent_page, PGSIZE);
+		writable = is_writable(pte);
+	}
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
+		printf("fail\n");
+		palloc_free_page(newpage);
+		return false;
 	}
 	return true;
 }
@@ -134,8 +157,12 @@ __do_fork (void *aux) {
 	struct intr_frame *parent_if;
 	bool succ = true;
 
+	parent_if = &parent->parent_tf;
+
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
+	// 자식 스레드 rax = 0으로 설정
+	if_.R.rax = 0;
 
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
@@ -157,6 +184,19 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
+
+	// FDT 복사
+	for(int i = 0; i<FDT_COUNT_LIMIT; i++) {
+		struct file *file = parent->fdt[i];
+		if(file == NULL)
+			continue;
+		if(file > 2)
+			file = file_duplicate(file); // 파일 객체 복사
+		current->fdt[i] = file; // 자식 프로세스 fdt에 저장
+	}
+	current->next_fd = parent->next_fd; // 자식 프로세스의 fd index값을 부모 fd index값으로 설정
+
+	sema_up(&current->load_sema);
 
 	process_init ();
 

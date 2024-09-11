@@ -5,6 +5,7 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/synch.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -110,7 +111,14 @@ struct thread {
 	/*----------------------------Project 2 fd --------------------------------*/
 	struct file **fdt; // fd 테이블
 	int next_fd; // 다음 fd 인덱스
+
+	/*----------------------------Project 2 system call ------------------------*/
 	int exit_status; // exit 함수 구현
+	struct intr_frame parent_tf; // parent tf 저장 
+	struct semaphore load_sema;
+	struct semaphore wait_sema;
+
+
 
 
 #ifdef USERPROG
