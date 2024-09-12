@@ -158,7 +158,7 @@ void exit (int status) {
 	// It should print message “Name of process: exit(status)”.
 	struct thread* cur = thread_current();
 	cur->exit_status= status;
-	printf("(%s): exit(%d)\n", cur->name, status);
+	printf("%s:exit(%d)\n", cur->name, status);
 	thread_exit();//process_exit?
 	//sema up & down???
 }
