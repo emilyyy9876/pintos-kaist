@@ -84,6 +84,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
 	
 	uint64_t number= f->R.rax;
+	struct thread *curr = thread_current();
 
 	switch(number) {
 		//process 관련 syscall

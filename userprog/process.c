@@ -18,6 +18,7 @@
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+#include "user/syscall.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -350,14 +351,14 @@ process_exit (void) {
 	//현재 실행 중인 파일 닫기
 	file_close(curr->running_file);
 
-
+	process_cleanup ();
 
 	//기다리고 있는 부모에게 wait_sema를 up해서 신화를 보냄
 	sema_up(&curr->wait_sema);
 	//부모가 exit을 허락할 때까지 sema_down 못함
 	sema_down(&curr->exit_sema);
 
-	process_cleanup ();
+	
 }
 	
 
@@ -567,7 +568,8 @@ load (const char *file_name, struct intr_frame *if_) {
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close (file);//----------------->process_exit시 파일이 닫여야 함
+	if (!success)
+		file_close (file);//----------------->process_exit시 파일이 닫여야 함
 	return success;
 }
 
