@@ -83,7 +83,7 @@ filesys_open (const char *name) {
 	struct inode *inode = NULL;
 
 	if (dir != NULL)
-		dir_lookup (dir, name, &inode);
+		dir_lookup (dir, name, &inode); //"포인터 inode"를 전달함
 	dir_close (dir);
 
 	return file_open (inode);

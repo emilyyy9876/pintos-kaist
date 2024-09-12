@@ -15,7 +15,7 @@ struct file {
  * allocation fails or if INODE is null. */
 struct file *
 file_open (struct inode *inode) {
-	struct file *file = calloc (1, sizeof *file);
+	struct file *file = calloc (1, sizeof *file); //파일을 열때마다 메모리 할당하면서 파일 디스크립터를 새로 만듬
 	if (inode != NULL && file != NULL) {
 		file->inode = inode;
 		file->pos = 0;

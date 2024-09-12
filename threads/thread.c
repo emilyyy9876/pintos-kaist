@@ -11,6 +11,8 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+//-----------------------project1-------------------//
+#include "lib/kernel/list.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -74,6 +76,9 @@ static void init_thread (struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
+//--------------------------------project2--------------------------------
+
+//------------------------------------------------------------------------
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -299,6 +304,21 @@ thread_create (const char *name, int priority,	// 새로운 커널 스레드를 
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
+
+	//<-------------project.2------------->
+	t->fdt = palloc_get_multiple(PAL_ZERO, FDT_PAGES);
+	if (t->fdt == NULL)
+        return TID_ERROR;
+	
+	t->next_fd = 2;
+	t->fdt[0] = 1; /* 예약됨*/
+	t->fdt[1] = 2; /* 예약됨*/
+
+	struct  thread *parent = thread_current();
+	list_push_back(&parent->child_list, &t->child_elem);
+	sema_init(&t->wait_sema, 0);
+	//-----------------------------------
+
 	/* Add to run queue. */
 	thread_unblock (t);
 	test_max_priority();
@@ -391,7 +411,7 @@ thread_exit (void) {
 
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
-	intr_disable ();
+	intr_disable ();//thread list를 조작할 때는 반드시, intr_disable을 호출해야
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();
 }
@@ -420,18 +440,28 @@ thread_set_priority (int new_priority) {	// 스레드 우선순위 new_priority�
 	update_priority_from_donation();
 	test_max_priority();
 }
-void test_max_priority (void){
-	if (list_empty(&ready_list)) {
-		return;
-	}
+void test_max_priority(void)
+{
+   if (list_empty(&ready_list))
+   {
+      return;
+   }
 
-	int run_priority = thread_current()->priority;
-	struct list_elem *e = list_begin(&ready_list);
-	struct thread *t = list_entry(e, struct thread, elem);
+   int run_priority = thread_current()->priority;
+   struct list_elem *e = list_begin(&ready_list);
+   struct thread *t = list_entry(e, struct thread, elem);
 
-	if (t->priority > run_priority) {
-		thread_yield();
-	}
+   if (t->priority > run_priority)
+   {
+      if (intr_context())
+      {
+         intr_yield_on_return();
+      }
+      else
+      {
+         thread_yield();
+      }
+   }
 }
 
 
@@ -533,6 +563,21 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->magic = THREAD_MAGIC;
     t->wait_on_lock = NULL;
     list_init(&(t->donations));
+	//------project2-----------------//
+	if (t != initial_thread){
+		t->fdt = palloc_get_multiple(PAL_ZERO, FDT_PAGES);
+		if (t->fdt == NULL) {
+			PANIC("Failed to allocate file descriptor table");
+		}
+		t->next_fd = 2;  // 0: stdin, 1: stdout
+	}
+	t->exit_status = 0;
+	list_init(&t->child_list);
+	sema_init(&t->fork_sema, 0);
+	sema_init(&t->wait_sema, 0);
+	sema_init(&t->exit_sema, 0);
+	t->running_file = NULL;
+	
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -712,3 +757,19 @@ allocate_tid (void) {
 
 	return tid;
 }
+
+
+//-----------------project2-----------------------------------
+struct thread *get_child_from_pid(int pid) {
+	struct thread *cur = thread_current();
+	struct list *child_list = &cur->child_list;
+
+	for (struct list_elem *e = list_begin(child_list); e != list_end(child_list); e = list_next(e))
+	{
+		struct thread *t = list_entry(e, struct thread, child_elem);
+		if (t->tid == pid)
+			return t;
+	}	
+	return NULL;
+}
+//------------------------------------------------------
