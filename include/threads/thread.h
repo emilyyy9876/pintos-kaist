@@ -115,8 +115,14 @@ struct thread {
 	/*----------------------------Project 2 system call ------------------------*/
 	int exit_status; // exit 함수 구현
 	struct intr_frame parent_tf; // parent tf 저장 
-	struct semaphore load_sema;
+
+	struct semaphore fork_sema;
 	struct semaphore wait_sema;
+	struct semaphore free_sema;
+	struct list_elem child_elem;
+	struct list child_list;
+	struct file *running;
+	
 
 
 

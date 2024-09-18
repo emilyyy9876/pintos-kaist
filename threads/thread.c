@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "threads/flags.h"
-#include "threads/interrupt.h"
+#include "threads/interrupt.h"`
 #include "threads/intr-stubs.h"
 #include "threads/palloc.h"
 #include "threads/synch.h"
@@ -298,6 +298,7 @@ thread_create (const char *name, int priority,	// 새로운 커널 스레드를 
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+	list_push_back(&thread_current()->child_list, &t->child_elem);
 	/*----------------------------Project 2 fd --------------------------------*/
 	t->fdt = palloc_get_multiple(PAL_ZERO, FDT_PAGES); // fdt 초기화
 
@@ -427,21 +428,20 @@ thread_set_priority (int new_priority) {	// 스레드 우선순위 new_priority�
 	test_max_priority();
 }
 void test_max_priority (void){
-	if (list_empty(&ready_list)) {
-		return;
-	}
-
 	int run_priority = thread_current()->priority;
 	struct list_elem *e = list_begin(&ready_list);
 	struct thread *t = list_entry(e, struct thread, elem);
 
-	// project2: 초기 설정 
+	//project2: 초기 설정 
 	if (t->priority > run_priority) {
 		if (intr_context())
 			intr_yield_on_return();
 		else 
 			thread_yield();
 	}
+	// if (!list_empty (&ready_list) &&  thread_current ()->priority < 
+	// list_entry (list_front (&ready_list), struct thread, elem)->priority)
+	// 	thread_yield ();
 }
 
 
@@ -544,7 +544,12 @@ init_thread (struct thread *t, const char *name, int priority) {
     t->wait_on_lock = NULL;
     list_init(&(t->donations));
 	/*----------------------------Project 2 fd --------------------------------*/
+	list_init(&t->child_list);
 	t->next_fd = 2; // 0, 1은 테이블에서 stdin/stdout이 이미 사용 중
+	sema_init(&t->wait_sema, 0);
+	sema_init(&t->free_sema, 0);
+	/*----------------------------Project 2 system call -----------------------*/
+	sema_init(&t->fork_sema, 0); // syscall.c에 있어서 안해도되나?
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -690,6 +695,8 @@ schedule (void) {	// 현재 running 중인 스레드를 꺼내고 ready_list 맨
 
 #ifdef USERPROG
 	/* Activate the new address space. */
+	// if (list_empty(&ready_list))
+    // 	return;
 	process_activate (next);
 #endif
 

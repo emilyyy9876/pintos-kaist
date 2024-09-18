@@ -69,6 +69,7 @@
     "intrinsic.h": "c",
     "file.h": "c",
     "process.h": "c",
-    "syscall.h": "c"
+    "syscall.h": "c",
+    "interrupt.h": "c"
   }
 }

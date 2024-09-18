@@ -13,6 +13,7 @@
 #include "filesys/file.h"
 #include "userprog/process.h"
 #include "threads/synch.h"
+#include "threads/palloc.h"
 
 
 void syscall_entry (void);
@@ -27,7 +28,9 @@ int read_handler(int fd, void *buffer, unsigned size);
 int write_handler(int fd, const void *buffer, unsigned size);
 void seek_handler(int fd, unsigned position);
 unsigned tell_handler(int fd);
-void close(int fd);
+void close_handler(int fd);
+void check_validity(const uint64_t *addr);
+void remove_file_from_fdt(int fd);
 
 /* System call.
  *
@@ -58,11 +61,12 @@ syscall_init (void) {
 }
 
 //valid한 address인지 확인하는 함수, null 아닌지 / 커널에 있지 않은지 / unmap아닌지 확인
-void check_validity(const uint64_t *uaddr) {
-    struct thread *cur = thread_current();
-    if (uaddr == NULL || is_kernel_vaddr(uaddr)||pml4_get_page(cur->pml4, uaddr)==NULL) {
-        exit(-1);
-    }
+void check_validity(const uint64_t *addr) {
+    struct thread *t = thread_current();
+	if(!is_user_vaddr(addr) || addr == NULL)
+		exit_handler(-1);
+	if(pml4_get_page(t->pml4, addr) == NULL)
+		exit_handler(-1);
 }
 
 // 현재 thread fdt에서 주어진 fd 삭제
@@ -86,17 +90,27 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		case SYS_EXIT:
 			exit_handler(f->R.rdi);
 			break;
+		case SYS_FORK:
+			f->R.rax = fork_handler(f->R.rdi, f);
+			break;
+		case SYS_EXEC:
+			if (exec_handler(f->R.rdi) == -1)
+				exit_handler(-1);
+			break;
+		case SYS_WAIT:
+			f->R.rax = process_wait(f->R.rdi);
+			break;
 		case SYS_CREATE:
-			f->R.rax = create_handler(f->R.rdi, f->R.rsi);
+			f->R.rax = create_handler((char *)f->R.rdi, f->R.rsi);
 			break;
 		case SYS_REMOVE:
-			f->R.rax = remove_handler(f->R.rdi);
+			f->R.rax = remove_handler((char *)f->R.rdi);
 			break;
 		case SYS_OPEN:
-			f->R.rax = open_handler(f->R.rdi);
+			f->R.rax = open_handler((char *)f->R.rdi);
 			break;
 		case SYS_FILESIZE:
-			f->R.rax = filesize_handler(f->R.rdi);		
+			f->R.rax = filesize_handler((char *)f->R.rdi);		
 			break;
 		case SYS_READ:
 			f->R.rax = read_handler(f->R.rdi,f->R.rsi, f->R.rdx);
@@ -114,7 +128,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			close_handler(f->R.rdi);
 			break;		
 		default:
-			exit(-1);
+			exit_handler(-1);
 			break;
 	}
 }
@@ -130,14 +144,36 @@ void exit_handler(int status) {
 	printf("%s: exit(%d)", curr->name, curr->exit_status);
 }
 
+int exec_handler(char *file_name) {
+	check_validity(file_name);
+
+	int file_size = strlen(file_name)+1;
+	char *fn_copy = palloc_get_page(PAL_ZERO);
+	if (fn_copy == NULL) {
+		exit_handler(-1);
+	}
+	strlcpy(fn_copy, file_name, file_size);
+
+	if(process_exec(fn_copy) == -1) {
+		return -1;
+	}
+
+	NOT_REACHED();
+	return 0;
+}
+
+tid_t fork_handler(const char *thread_name, struct intr_frame *f) {
+	return process_fork(thread_name, f);
+} 
+
 bool create_handler(const char *file, unsigned initial_size) {
 	check_validity(file);
-	filesys_create(file, initial_size);
+	return filesys_create(file, initial_size);
 }
 
 bool remove_handler(const char *file) {
 	check_validity(file);
-	filesys_remove(file);
+	return filesys_remove(file);
 }
 
 int open_handler(const char *file) {
@@ -251,7 +287,7 @@ unsigned tell_handler(int fd) {
 	file_tell(file);
 }
 
-void close(int fd) {
+void close_handler(int fd) {
 	struct file *file= process_get_file(fd);
 
 	if(file == NULL) {

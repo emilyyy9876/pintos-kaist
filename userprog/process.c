@@ -94,6 +94,8 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	sema_down(&thread_current()->wait_sema);
 	// 새로운(child) 쓰레드에 현재(parent) 쓰레드 복사
 	thread_create (name, PRI_DEFAULT, __do_fork, parent);
+
+	return 1;
 }
 
 #ifndef VM
@@ -196,7 +198,7 @@ __do_fork (void *aux) {
 	}
 	current->next_fd = parent->next_fd; // 자식 프로세스의 fd index값을 부모 fd index값으로 설정
 
-	sema_up(&current->load_sema);
+	sema_up(&current->fork_sema);
 
 	process_init ();
 
@@ -206,6 +208,21 @@ __do_fork (void *aux) {
 error:
 	thread_exit ();
 }
+
+/* ------------------------Project2------------------------------*/
+struct thread *get_child_with_pid(int pid) {
+	struct thread *cur = thread_current();
+	struct list *child_list = &cur->child_list;
+
+	for (struct list_elem *e = list_begin(child_list); e != list_end(child_list); e = list_next(e))
+	{
+		struct thread *t = list_entry(e, struct thread, child_elem);
+		if (t->tid == pid)
+			return t;
+	}	
+	return NULL;
+}
+
 
 /* Switch the current execution context to the f_name.
  * Returns -1 on fail. */
@@ -256,8 +273,25 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	while(1) {}
-	return -1;
+
+	/* System call 추가 */
+	// while(1);
+	// return -1;
+	struct thread *child = get_child_with_pid(child_tid); /* 자식 프로세스의 프로세스 디스크립터 검색 */
+
+	// [Fail] Not my child /* 예외 처리 발생시 -1 리턴 */
+	if (child == NULL)
+		return -1; 
+
+	// Parent waits until child signals (sema_up) after its execution
+	sema_down(&child->wait_sema); /* 자식프로세스가 종료될 때까지 부모 프로세스 대기(세마포어 이용) */
+
+	int exit_status = child->exit_status;
+
+	// Keep child page so parent can get exit_status 
+	list_remove(&child->child_elem); /* 자식 프로세스 디스크립터 삭제 */
+	sema_up(&child->free_sema); // wake-up child in process_exit - proceed with thread_exit
+	return exit_status; /* 자식 프로세스의 exit status 리턴 */
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -268,7 +302,7 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-
+	sema_up(&curr->wait_sema);
 	process_cleanup ();
 }
 
@@ -569,7 +603,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	argument_stack(argv, argc, if_);
 
 	// 스택 확인용 함수 0x4747ffc8 확인
-	hex_dump(if_->rsp, if_->rsp, USER_STACK - (uint64_t)if_->rsp, true);
+	// hex_dump(if_->rsp, if_->rsp, USER_STACK - (uint64_t)if_->rsp, true);
 
 	success = true;
 
