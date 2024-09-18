@@ -19,7 +19,7 @@
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 void halt_handler(void);
-void exit_handler(int status);
+
 bool create_handler(const char *file, unsigned initial_size);
 bool remove_handler(const char *file);
 int open_handler(const char *file);
@@ -140,8 +140,8 @@ void halt_handler(void) {
 void exit_handler(int status) {
 	struct thread *curr = thread_current();
 	curr->exit_status = status;
+	printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 	thread_exit();
-	printf("%s: exit(%d)", curr->name, curr->exit_status);
 }
 
 int exec_handler(char *file_name) {
@@ -239,14 +239,6 @@ int write_handler(int fd, const void *buffer, unsigned size) {
 	lock_acquire(&filesys_lock);
 
 	int ret;
-	// 파일 디스크립터 테이블에서 파일 객체를 가져옴
-	struct file *file = process_get_file(fd);
-
-	// 파일 객체가 null일 경우
-	if(file == NULL) {
-		lock_release(&filesys_lock);
-		return -1;
-	} 
 
 	if(fd == STDOUT_FILENO) {	// 표준출력인 경우
 		putbuf(buffer, size);
@@ -254,7 +246,13 @@ int write_handler(int fd, const void *buffer, unsigned size) {
 	} else if(fd == STDIN_FILENO) {		// 표준입력인 경우, 쓰기 불가능하므로 오류 반환
 		ret = -1;
 	} else {	// 일반 파일 처리
-		ret = file_write(file, buffer, size);
+		struct file *file = process_get_file(fd);
+		// 파일 객체가 null일 경우
+		if(file == NULL) {
+			ret = -1;
+		} else {
+			ret = file_write(file, buffer, size);
+		}
 	}
 
 	lock_release(&filesys_lock);
